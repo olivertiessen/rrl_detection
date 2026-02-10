@@ -10,7 +10,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/models', ['best.pt']),
+        ('share/' + package_name + '/models', ['models/dexterity-model/best.pt']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

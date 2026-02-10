@@ -25,31 +25,45 @@ from cv_bridge import CvBridge
 class DetectionNode(Node):
     def __init__(self):
         super().__init__('detection_node')
+        print('Initializing object detection')
         self.bridge = CvBridge()
         
         self.declare_parameter('confidence_threshold', 0.7)
         self.confidence_threshold = self.get_parameter('confidence_threshold').get_parameter_value().double_value
 
+        print('Initializing the yolo annotated image topic')
         self.detections = self.create_publisher(Image, '/yolo_detections', 10)
         self.tf_broadcaster = TransformBroadcaster(self)
         
+        print('Initializing input camera topics')
+        camera_info = '/camera/camera/color/camera_info'
         self.camera_model = PinholeCameraModel()
         self.info_sub = self.create_subscription(CameraInfo, '/camera/camera/color/camera_info', self.info_callback, 10)
         
+        camera_topic = '/camera/camera/color/image_raw'
         self.subscription = self.create_subscription(Image, '/camera/camera/color/image_raw', self.image_callback, 10)
         self.subscription  # prevent unused variable warning        
         
+        print('Initializing YOLO')
+        model_file = 'best.pt'
         package_share_directory = get_package_share_directory('object_detection')
-        model_path = os.path.join(package_share_directory, 'models', 'best.pt')
+        model_path = os.path.join(package_share_directory, 'models', model_file)
         self.model = YOLO(model_path)  # standard YOLOv8 nano model
 
+        print('Initializing depth camera topics')
+        depth_camera_topic = '/camera/camera/aligned_depth_to_color/image_raw'
         self.latest_depth_image = None
         self.depth_subscription = self.create_subscription(
             Image,
-            '/camera/camera/aligned_depth_to_color/image_raw',
+            depth_camera_topic,
             self.depth_callback,
             10)
-
+        print('Node initialized with: ')
+        print('Model = ' + model_file)
+        print('Confidence thres = ' + str(self.confidence_threshold))
+        print('Camera topic = ' + camera_topic)
+        print('Depth camera topic = ' + depth_camera_topic)
+        print('Node successfully initialized')
     def info_callback(self, info_msg):
         self.camera_model.fromCameraInfo(info_msg)
 
