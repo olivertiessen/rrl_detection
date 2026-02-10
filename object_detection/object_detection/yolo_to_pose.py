@@ -36,12 +36,13 @@ class DetectionNode(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
         
         print('Initializing input camera topics')
-        camera_info = '/camera/camera/color/camera_info'
+        self.img_cnt = 0
+        camera_info = '/Spot/kinect_color/camera_info'
         self.camera_model = PinholeCameraModel()
-        self.info_sub = self.create_subscription(CameraInfo, '/camera/camera/color/camera_info', self.info_callback, 10)
+        self.info_sub = self.create_subscription(CameraInfo, camera_info, self.info_callback, 10)
         
-        camera_topic = '/camera/camera/color/image_raw'
-        self.subscription = self.create_subscription(Image, '/camera/camera/color/image_raw', self.image_callback, 10)
+        camera_topic = '/Spot/kinect_color/image_color'
+        self.subscription = self.create_subscription(Image, camera_topic, self.image_callback, 10)
         self.subscription  # prevent unused variable warning        
         
         print('Initializing YOLO')
@@ -51,7 +52,7 @@ class DetectionNode(Node):
         self.model = YOLO(model_path)  # standard YOLOv8 nano model
 
         print('Initializing depth camera topics')
-        depth_camera_topic = '/camera/camera/aligned_depth_to_color/image_raw'
+        depth_camera_topic = '/Spot/kinect_range/image'
         self.latest_depth_image = None
         self.depth_subscription = self.create_subscription(
             Image,
@@ -74,8 +75,15 @@ class DetectionNode(Node):
             self.get_logger().error(f'Error processing depth image: {e}')
 
     def image_callback(self, frame):
+        self.img_cnt = self.img_cnt + 1
+        if self.img_cnt < 20:
+            return
+        print('processing image')
         frame = self.bridge.imgmsg_to_cv2(frame, "bgr8")
         results = self.model(frame, stream=True, conf=self.confidence_threshold)
+        results_list = list(results)
+        if len(results_list) > 0:
+            print(str(len(results_list)) + ' object/s detected')
         for r in results:
             boxes = r.boxes
             for box in boxes:
@@ -192,6 +200,7 @@ class DetectionNode(Node):
                 # Draw center point
                 cv2.circle(frame, (cx, cy), 2, (0, 255, 0), -1)
         self.detections.publish(self.bridge.cv2_to_imgmsg(frame, 'bgr8'))
+        self.img_cnt = 0
 
 def main():
     rclpy.init()
